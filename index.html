@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IoT Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f5f5f5;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    .dashboard {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .sensor-values {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 1rem;
+    }
+
+    @media (min-width: 600px) {
+      .sensor-values {
+        flex-direction: row;
+        justify-content: space-between;
+      }
+    }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 250px;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  </style>
+</head>
+<body>
+  <h2>IoT Room Dashboard</h2>
+  <div class="dashboard">
+
+    <!-- Sensor Readings -->
+    <div class="section sensor-values">
+      <div><strong>Temperature:</strong> <span id="temp">--</span> °C</div>
+      <div><strong>LDR:</strong> <span id="ldr">--</span></div>
+      <div><strong>Fan Status:</strong> <span id="fan">--</span></div>
+      <div><strong>LED Status:</strong> <span id="led">--</span></div>
+    </div>
+
+    <!-- Temperature Chart -->
+    <div class="section">
+      <p><strong>Temperature Graph:</strong></p>
+      <div class="chart-container">
+        <canvas id="tempChart"></canvas>
+      </div>
+    </div>
+
+    <!-- LDR Chart -->
+    <div class="section">
+      <p><strong>LDR Graph:</strong></p>
+      <div class="chart-container">
+        <canvas id="ldrChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+
+    client.on('connect', () => {
+      client.subscribe('/iot/sensors/temperature');
+      client.subscribe('/iot/sensors/ldr');
+      client.subscribe('/iot/status/fan');
+      client.subscribe('/iot/status/led');
+    });
+
+    client.on('message', (topic, message) => {
+      const msg = message.toString();
+
+      if (topic === '/iot/sensors/temperature') {
+        document.getElementById('temp').innerText = msg;
+        updateTempChart(parseFloat(msg));
+      } else if (topic === '/iot/sensors/ldr') {
+        document.getElementById('ldr').innerText = msg;
+        updateLDRChart(parseInt(msg));
+      } else if (topic === '/iot/status/fan') {
+        document.getElementById('fan').innerText = msg;
+      } else if (topic === '/iot/status/led') {
+        document.getElementById('led').innerText = msg;
+      }
+    });
+
+    const tempCtx = document.getElementById('tempChart').getContext('2d');
+    const ldrCtx = document.getElementById('ldrChart').getContext('2d');
+
+    const tempChart = new Chart(tempCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Temperature (°C)',
+          data: [],
+          borderColor: 'red',
+          backgroundColor: 'rgba(255, 0, 0, 0.1)',
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { x: { display: false }, y: { beginAtZero: true } }
+      }
+    });
+
+    const ldrChart = new Chart(ldrCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'LDR Value',
+          data: [],
+          borderColor: 'blue',
+          backgroundColor: 'rgba(0, 0, 255, 0.1)',
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { x: { display: false }, y: { beginAtZero: true } }
+      }
+    });
+
+    function updateTempChart(value) {
+      const d = tempChart.data;
+      d.labels.push('');
+      d.datasets[0].data.push(value);
+      if (d.labels.length > 20) {
+        d.labels.shift();
+        d.datasets[0].data.shift();
+      }
+      tempChart.update();
+    }
+
+    function updateLDRChart(value) {
+      const d = ldrChart.data;
+      d.labels.push('');
+      d.datasets[0].data.push(value);
+      if (d.labels.length > 20) {
+        d.labels.shift();
+        d.datasets[0].data.shift();
+      }
+      ldrChart.update();
+    }
+  </script>
+</body>
+</html>
