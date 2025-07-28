@@ -5,15 +5,23 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial; margin: 20px; }
+    body {
+      font-family: Arial;
+      margin: 20px;
+    }
     .fan {
-      width: 100px; height: 100px;
+      width: 100px;
+      height: 100px;
       background: url('https://i.imgur.com/xhGAz1S.png') no-repeat center center;
       background-size: cover;
+      margin-top: 10px;
     }
-    .rotate { animation: spin 1s linear infinite; }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    button { margin: 5px; padding: 8px 15px; }
+    .rotate {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -22,20 +30,11 @@
   <p><strong>LDR:</strong> <span id="ldr">--</span></p>
   <p><strong>Fan Status:</strong> <span id="fan">--</span></p>
   <p><strong>LED Status:</strong> <span id="led">--</span></p>
+
+  <!-- Fan image -->
   <div id="fan-img" class="fan"></div>
 
-  <h3>Manual Controls</h3>
-  <p>
-    Fan: 
-    <button onclick="controlFan('ON')">Turn ON</button>
-    <button onclick="controlFan('OFF')">Turn OFF</button>
-  </p>
-  <p>
-    LED: 
-    <button onclick="controlLED('ON')">Turn ON</button>
-    <button onclick="controlLED('OFF')">Turn OFF</button>
-  </p>
-
+  <!-- Charts -->
   <canvas id="tempChart" width="400" height="150"></canvas>
   <canvas id="ldrChart" width="400" height="150"></canvas>
 
@@ -43,12 +42,14 @@
     const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
     client.on('connect', () => {
+      console.log("Connected to MQTT");
       client.subscribe('/iot/sensors/temperature');
       client.subscribe('/iot/sensors/ldr');
       client.subscribe('/iot/status/fan');
       client.subscribe('/iot/status/led');
     });
 
+    // Fan animation handler
     const fanImg = document.getElementById("fan-img");
 
     client.on('message', (topic, message) => {
@@ -61,19 +62,15 @@
         updateLDRChart(parseInt(msg));
       } else if (topic === '/iot/status/fan') {
         document.getElementById('fan').innerText = msg;
-        fanImg.classList.toggle("rotate", msg === "ON");
+        if (msg === "ON") {
+          fanImg.classList.add("rotate");
+        } else {
+          fanImg.classList.remove("rotate");
+        }
       } else if (topic === '/iot/status/led') {
         document.getElementById('led').innerText = msg;
       }
     });
-
-    function controlFan(state) {
-      client.publish('/iot/control/fan', state);
-    }
-
-    function controlLED(state) {
-      client.publish('/iot/control/led', state);
-    }
 
     // Chart.js setup
     const tempCtx = document.getElementById('tempChart').getContext('2d');
@@ -81,27 +78,63 @@
 
     const tempChart = new Chart(tempCtx, {
       type: 'line',
-      data: { labels: [], datasets: [{ label: 'Temp (°C)', data: [], borderColor: 'red' }] },
-      options: { animation: false, scales: { x: { display: false }, y: { beginAtZero: true } } }
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Temperature (°C)',
+          data: [],
+          borderColor: 'red',
+          fill: false
+        }]
+      },
+      options: {
+        animation: false,
+        scales: {
+          x: { display: false },
+          y: { beginAtZero: true }
+        }
+      }
     });
 
     const ldrChart = new Chart(ldrCtx, {
       type: 'line',
-      data: { labels: [], datasets: [{ label: 'LDR', data: [], borderColor: 'blue' }] },
-      options: { animation: false, scales: { x: { display: false }, y: { beginAtZero: true } } }
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'LDR Value',
+          data: [],
+          borderColor: 'blue',
+          fill: false
+        }]
+      },
+      options: {
+        animation: false,
+        scales: {
+          x: { display: false },
+          y: { beginAtZero: true }
+        }
+      }
     });
 
-    function updateTempChart(val) {
-      const data = tempChart.data.datasets[0].data;
-      data.push(val);
-      if (data.length > 20) data.shift();
+    function updateTempChart(value) {
+      const chart = tempChart.data;
+      chart.labels.push('');
+      chart.datasets[0].data.push(value);
+      if (chart.labels.length > 20) {
+        chart.labels.shift();
+        chart.datasets[0].data.shift();
+      }
       tempChart.update();
     }
 
-    function updateLDRChart(val) {
-      const data = ldrChart.data.datasets[0].data;
-      data.push(val);
-      if (data.length > 20) data.shift();
+    function updateLDRChart(value) {
+      const chart = ldrChart.data;
+      chart.labels.push('');
+      chart.datasets[0].data.push(value);
+      if (chart.labels.length > 20) {
+        chart.labels.shift();
+        chart.datasets[0].data.shift();
+      }
       ldrChart.update();
     }
   </script>
